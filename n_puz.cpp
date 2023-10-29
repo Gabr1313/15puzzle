@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+
 #include <iostream>
 using namespace std;
 // #include <ext/pb_ds/tree_policy.hpp>
@@ -78,7 +79,10 @@ int heuristic(vu8& mat, u8 row, u8 col) {
 // dist, heu, pos_of_0, mat
 using state = tuple<int, int, u8, vu8>;
 struct myComp {
-    constexpr bool operator()(state const& a, state const& b) const noexcept { return get<0>(a) > get<0>(b); }
+    constexpr bool operator()(state const& a, state const& b) const noexcept {
+        if (get<0>(a) == get<0>(b)) return get<1>(a) > get<1>(b);
+        return get<0>(a) > get<0>(b);
+    }
 };
 
 void try_insert(priority_queue<state, vector<state>, myComp>& q, const state& node, u8 k, u8 k2, int diff) {
@@ -192,7 +196,7 @@ int main() {
                     for (int i = 0; i < n; i++) cout << "\x1b[A";
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
             }
-        } 
+        }
     }
 
     return 0;

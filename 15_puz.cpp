@@ -55,14 +55,8 @@ using pii = pair<int, int>;
 #define ROW 4
 #define COL 4
 
-inline ll hasher(const vu8& mat) {
-    ll hash = 0, pow = 1;
-    for (int i = 0; i < SZ; i++, pow *= SZ) hash += mat[i] * (1ull << (i << 2));
-    return hash;
-}
-
-// hash, dist, pos_of_0_prec
-unordered_map<ll, pair<u8, u8>> moves;
+// mat, dist, pos_of_0_prec
+unordered_map<ll, tuple<u8, u8, bool>> moves;
 
 inline u8 heuristic(ll mat) {
     int sum = 0;
@@ -78,36 +72,38 @@ inline u8 heuristic(ll mat) {
 
 // dist, heu, pos_of_0, mat
 using state = tuple<u8, u8, u8, ll>;
-struct myComp {
-    constexpr bool operator()(state const& a, state const& b) const noexcept { return get<0>(a) > get<0>(b); }
-};
 
-inline void try_insert(priority_queue<state, vector<state>, myComp>& q, const state& node, u8 k, u8 k2, int diff, int node_value) {
+inline void try_insert(priority_queue<state, vector<state>, std::greater<state>>& q, const state& node, u8 k, u8 k2, int diff, int node_value) {
     ll new_hash = get<3>(node);
     new_hash -= node_value * (1ull << k2);
     new_hash += node_value * (1ull << k);
     int heu = get<1>(node) + diff;
     int dist = get<0>(node) + diff + 1;
     auto search = moves.find(new_hash);
-    if (search == moves.end() || dist < search->second.first) {
-        moves[new_hash] = {dist, k};
+    if (search == moves.end() || dist < get<0>(search->second)) {
+        moves[new_hash] = {dist, k, false};
         q.push({dist, heu, k2, new_hash});
     }
 }
 
-u8 a_star(ll start_hash) {
-    priority_queue<state, vector<state>, myComp> q;
+pair<u8, ll> a_star(ll start_hash) {
+    priority_queue<state, vector<state>, std::greater<state>> q;
     u8 heu = heuristic(start_hash);
     u8 idx_zero;
     for (idx_zero = 0; idx_zero < SZ; idx_zero++)
         if ((start_hash >> (idx_zero << 2) & 15) == 0) break;
     q.push({heu, heu, idx_zero << 2, start_hash});
-    moves[start_hash] = {0, idx_zero << 2};
+    moves[start_hash] = {0, idx_zero << 2, false};
 
+    ll cnt = 0;
     while (!q.empty()) {
         auto node = q.top();
         q.pop();
-        if (get<1>(node) == 0) return get<0>(node);
+        auto search = moves.find(get<3>(node));
+        if (get<2>(search->second)) continue;
+        else get<2>(search->second) = true;
+        cnt++;
+        if (get<1>(node) == 0) return {get<0>(node), cnt};
         u8 k = get<2>(node), i = k >> 4, j = (k >> 2) & 3;
         if (i > 0) {
             u8 k2 = k - (COL << 2);
@@ -134,7 +130,7 @@ u8 a_star(ll start_hash) {
             try_insert(q, node, k, k2, diff, node_value);
         }
     }
-    return 0xff;
+    return {0xff, cnt};
 }
 
 vector<ll> solution(u8 step) {
@@ -143,7 +139,7 @@ vector<ll> solution(u8 step) {
     for (int i = 1; i < SZ; i++) mat_hash += i * (1ull << ((i - 1) << 2));
     stak.push_back(mat_hash);
     for (u8 k = 60; step > 0; step--) {
-        auto [_, k0] = moves[mat_hash];
+        auto k0 = get<1>(moves[mat_hash]);
         ll el = (mat_hash >> k0) & 15;
         mat_hash &= ~(15ull << k0);
         mat_hash |= (el << k);
@@ -170,10 +166,10 @@ int main() {
 
     using namespace std::chrono;
     auto start = high_resolution_clock::now();
-    u8 step = a_star(mat_hash);
+    auto [step, processed] = a_star(mat_hash);
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
-    cout << (int)step << " moves found in " << duration.count() << "ms" << endl;
+    cout << (int)step << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
 
     if (step != 0xff) {
         auto sol = solution(step);
@@ -191,7 +187,7 @@ int main() {
                     for (int i = 0; i < n; i++) cout << "\x1b[A";
                 std::this_thread::sleep_for(std::chrono::milliseconds(250));
             }
-        }
+        } 
     }
 
     return 0;
