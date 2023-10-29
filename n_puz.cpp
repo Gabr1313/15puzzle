@@ -168,7 +168,14 @@ int main() {
         el = (u8)x;
         verif[x] = true;
     }
+
+    using namespace std::chrono;
+    auto start = high_resolution_clock::now();
     int step = a_star(mat, n, m);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start);
+    cout << step << " moves found in " << duration.count() << "ms" << endl;
+
     cout << step << endl;
     if (step != -1) {
         auto sol = solution(n, m, step);

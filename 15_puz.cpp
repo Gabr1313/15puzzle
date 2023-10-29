@@ -1,6 +1,4 @@
 #include <bits/stdc++.h>
-
-#include <cassert>
 using namespace std;
 // #include <ext/pb_ds/tree_policy.hpp>
 // #include <ext/pb_ds/assoc_container.hpp>
@@ -48,45 +46,46 @@ void _dbg(Head H, Tail... T) {
 #define dbg(...) 42
 #endif
 
-using ll = unsigned long long;
 using u8 = unsigned char;
+using ll = unsigned long long;
 using vu8 = vector<u8>;
 using pii = pair<int, int>;
 
-#define sz 16
-#define row 4
-#define col 4
+#define SZ 16
+#define ROW 4
+#define COL 4
 
 inline ll hasher(const vu8& mat) {
     ll hash = 0, pow = 1;
-    for (int i = 0; i < sz; i++, pow *= sz) hash += mat[i] * (1ull << (4 * i));
+    for (int i = 0; i < SZ; i++, pow *= SZ) hash += mat[i] * (1ull << (i << 2));
     return hash;
 }
 
-unordered_map<ll, pair<int, u8>> moves;
+// hash, dist, pos_of_0_prec
+unordered_map<ll, pair<u8, u8>> moves;
 
-inline int heuristic(vu8& mat) {
+inline u8 heuristic(ll mat) {
     int sum = 0;
-    for (u8 i = 0, k = 0; i < row; i++) {
-        for (u8 j = 0; j < col; j++, k++) {
-            if (mat[k] == 0) continue;
-            int el = mat[k] - 1;
-            sum += abs(i - (el >> 2)) + abs(j - (el & 3));
+    for (u8 i = 0, k = 0; i < ROW; i++) {
+        for (u8 j = 0; j < COL; j++, k++) {
+            int el = (mat >> (4 * k)) & 15;
+            if (el == 0) continue;
+            sum += abs(i - ((el - 1) >> 2)) + abs(j - ((el - 1) & 3));
         }
     }
     return sum;
 }
 
 // dist, heu, pos_of_0, mat
-using state = tuple<int, int, u8, ll>;
+using state = tuple<u8, u8, u8, ll>;
 struct myComp {
     constexpr bool operator()(state const& a, state const& b) const noexcept { return get<0>(a) > get<0>(b); }
 };
 
 inline void try_insert(priority_queue<state, vector<state>, myComp>& q, const state& node, u8 k, u8 k2, int diff, int node_value) {
     ll new_hash = get<3>(node);
-    new_hash -= node_value * (1ull << (4 * k2));
-    new_hash += node_value * (1ull << (4 * k));
+    new_hash -= node_value * (1ull << k2);
+    new_hash += node_value * (1ull << k);
     int heu = get<1>(node) + diff;
     int dist = get<0>(node) + diff + 1;
     auto search = moves.find(new_hash);
@@ -96,66 +95,59 @@ inline void try_insert(priority_queue<state, vector<state>, myComp>& q, const st
     }
 }
 
-int a_star(vu8& start) {
+u8 a_star(ll start_hash) {
     priority_queue<state, vector<state>, myComp> q;
-    {
-        int heu = heuristic(start);
-        int idx_zero;
-        for (idx_zero = 0; idx_zero < sz; idx_zero++)
-            if (start[idx_zero] == 0) break;
-        ll hash = hasher(start);
-        q.push({heu, heu, idx_zero, hash});
-        moves[hash] = {0, idx_zero};
-    }
+    u8 heu = heuristic(start_hash);
+    u8 idx_zero;
+    for (idx_zero = 0; idx_zero < SZ; idx_zero++)
+        if ((start_hash >> (idx_zero << 2) & 15) == 0) break;
+    q.push({heu, heu, idx_zero << 2, start_hash});
+    moves[start_hash] = {0, idx_zero << 2};
 
     while (!q.empty()) {
         auto node = q.top();
         q.pop();
         if (get<1>(node) == 0) return get<0>(node);
-        u8 k = get<2>(node), i = k >> 2, j = k & 3;
+        u8 k = get<2>(node), i = k >> 4, j = (k >> 2) & 3;
         if (i > 0) {
-            // dbg("up");
-            u8 k2 = k - col;
-            int node_value = (get<3>(node) >> (4 * k2)) & 15;
+            u8 k2 = k - (COL << 2);
+            int node_value = (get<3>(node) >> k2) & 15;
             int diff = abs(i - ((node_value - 1) >> 2)) - abs(i - 1 - ((node_value - 1) >> 2));
             try_insert(q, node, k, k2, diff, node_value);
         }
-        if (i < row - 1) {
-            // dbg("down");
-            u8 k2 = k + col;
-            int node_value = (get<3>(node) >> (4 * k2)) & 15;
+        if (i < ROW - 1) {
+            u8 k2 = k + (COL << 2);
+            int node_value = (get<3>(node) >> k2) & 15;
             int diff = abs(i - ((node_value - 1) >> 2)) - abs(i + 1 - ((node_value - 1) >> 2));
             try_insert(q, node, k, k2, diff, node_value);
         }
         if (j > 0) {
-            // dbg("left");
-            u8 k2 = k - 1;
-            int node_value = (get<3>(node) >> (4 * k2)) & 15;
+            u8 k2 = k - (1 << 2);
+            int node_value = (get<3>(node) >> k2) & 15;
             int diff = abs(j - ((node_value - 1) & 3)) - abs(j - 1 - ((node_value - 1) & 3));
             try_insert(q, node, k, k2, diff, node_value);
         }
-        if (j < col - 1) {
-            // dbg("right");
-            u8 k2 = k + 1;
-            int node_value = (get<3>(node) >> (4 * k2)) & 15;
+        if (j < COL - 1) {
+            u8 k2 = k + (1 << 2);
+            int node_value = (get<3>(node) >> k2) & 15;
             int diff = abs(j - ((node_value - 1) & 3)) - abs(j + 1 - ((node_value - 1) & 3));
             try_insert(q, node, k, k2, diff, node_value);
         }
     }
-    return -1;
+    return 0xff;
 }
 
-// a bit too slow, but nevermind
-vector<vector<u8>> solution(int step) {
-    u8 k = sz;
-    vector<u8> mat(k);
-    vector<vector<u8>> stak;
-    for (int i = 1; i < k; i++) mat[i - 1] = i;
-    stak.push_back(mat);
-    for (k--; step > 0; step--) {
-        auto [_, k0] = moves[hasher(mat)];
-        swap(mat[k], mat[k0]);
-        stak.push_back(mat);
+vector<ll> solution(u8 step) {
+    vector<ll> stak;
+    ll mat_hash = 0;
+    for (int i = 1; i < SZ; i++) mat_hash += i * (1ull << ((i - 1) << 2));
+    stak.push_back(mat_hash);
+    for (u8 k = 60; step > 0; step--) {
+        auto [_, k0] = moves[mat_hash];
+        ll el = (mat_hash >> k0) & 15;
+        mat_hash &= ~(15ull << k0);
+        mat_hash |= (el << k);
+        stak.push_back(mat_hash);
         k = k0;
     }
     reverse(stak.begin(), stak.end());
@@ -165,26 +157,33 @@ vector<vector<u8>> solution(int step) {
 int main() {
     int n, m;
     cin >> n >> m;
-    assert(n == row && m == col);
-    vector mat(sz, (u8)0);
-    vector<bool> verif(sz, false);
-    for (auto& el : mat) {
+    assert(n == ROW && m == COL);
+    ll mat_hash = 0;
+    vector<bool> verif(SZ, false);
+    for (int i = 0; i < SZ; i++) {
         int x;
         cin >> x;
-        assert(x < sz && !verif[x]);
-        el = (u8)x;
+        assert(x < SZ && !verif[x]);
         verif[x] = true;
+        mat_hash += x * (1ull << (i << 2));
     }
-    int step = a_star(mat);
-    cout << step << endl;
-    if (step != -1) {
+
+    using namespace std::chrono;
+    auto start = high_resolution_clock::now();
+    u8 step = a_star(mat_hash);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start);
+    cout << (int)step << " moves found in " << duration.count() << "ms" << endl;
+
+    if (step != 0xff) {
         auto sol = solution(step);
-        for (int t = 0; t < sol.size(); t++) {
-            for (int i = 0, k = 0; i < row; i++) {
-                for (int j = 0; j < col; j++, k++)
-                    if (sol[t][k]) cout << setw(3) << (int)sol[t][k] << " ";
-                    else cout << "    ";
-                cout << endl;
+        dbg(solution(step));
+        for (ll t = 0; t < sol.size(); t++) {
+            for (int i = 0; i < SZ; i++) {
+                u8 el = (sol[t] >> (i << 2)) & 15;
+                if (el) cout << setw(3) << (int)el << " ";
+                else cout << "    ";
+                if (i % 4 == 3) cout << endl;
             }
             {
                 // cout << endl;
