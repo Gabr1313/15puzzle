@@ -1,4 +1,6 @@
 #include <bits/stdc++.h>
+
+#include <iostream>
 using namespace std;
 // #include <ext/pb_ds/tree_policy.hpp>
 // #include <ext/pb_ds/assoc_container.hpp>
@@ -46,40 +48,43 @@ void _dbg(Head H, Tail... T) {
 #define dbg(...) 42
 #endif
 
-int main() {
-    int n, m, p, t;
-    cin >> n >> m, p = n * m, t = p * p /* * p */;
-    assert(p > 0 && p <= 255);
-    vector<int> mat(p);
-    for (int i = 1; i < p; i++) mat[i - 1] = i;
-    srand(time(0));
-    int i = n - 1, j = m - 1;
-    for (int tt = 0; tt < t; tt++) {
-        int r = rand() % 4;
-        switch (r) {
-            case 0:
-                if (i > 0) swap(mat[i * m + j], mat[(i - 1) * m + j]), i--;
-                else tt--;
-                break;
-            case 1:
-                if (i < n - 1) swap(mat[i * m + j], mat[(i + 1) * m + j]), i++;
-                else tt--;
-                break;
-            case 2:
-                if (j > 0) swap(mat[i * m + j], mat[i * m + j - 1]), j--;
-                else tt--;
-                break;
-            case 3:
-                if (j < m - 1) swap(mat[i * m + j], mat[i * m + j + 1]), j++;
-                else tt--;
-                break;
+// ANNEALING FOR TSP -> IS IT POSSIBLE TO TRANSLATE FOR THE 15 PUZZLE?
+/* const double BOLTZMAN = 0.01;
+const double INIT_TEMP = 1;
+
+// const double COOLIGN_FRACTION = 0.97; // up-down together
+// const ull COOLIGN_STEP = 500; // up-down together
+// const ull STEP_PER_TEMP = 1000; // up-down together 
+const double COOLIGN_FRACTION = 0.999;  // up-down together
+const ull COOLIGN_STEP = 5000;          // up-down together
+const ull STEP_PER_TEMP = 10000;        // up-down together
+
+int anneal(vi& v, vector<vector<int>>& distances) {
+    int distance = 0;
+    for (int i = 0; i < v.size(); i++) distance += distances[v[i]][v[(i + 1) % v.size()]];
+    double temperature = INIT_TEMP;
+    for (int i = 0; i < COOLIGN_STEP; i++) {
+        int start_value = distance;
+        double intial_temperature = temperature;
+        temperature *= COOLIGN_FRACTION;
+        for (int j = 0; j < STEP_PER_TEMP; j++) {
+            int k = rand() % v.size();
+            int l = rand() % v.size();
+            int cost = cost_change(v, distances, k, l);
+            if (cost < 0) {
+                swap(v[k], v[l]);
+                distance = distance + cost;
+                continue;
+            }
+            double e = -cost / (distance * BOLTZMAN * temperature);
+            double merit = exp(e);
+            float flip = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+            if (merit > flip) {
+                swap(v[k], v[l]);
+                distance = distance + cost;
+            }
         }
+        if (distance - start_value < 0) temperature = intial_temperature;
     }
-    cout << n << " " << m ;
-    for (int i = 0; i < p; i++) {
-        if (i % m == 0) cout << endl;
-        cout << setw(3) << mat[i] << " ";
-    }
-    cout << endl;
-    return 0;
-}
+    return distance;
+} */

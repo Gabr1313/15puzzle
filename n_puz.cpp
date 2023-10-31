@@ -162,7 +162,7 @@ int main() {
     int n, m, k;
     cin >> n >> m;
     k = n * m;
-    assert(k > 0 && k <= 255);
+    assert(k > 0 && k <= 255 && n > 1 && m > 1);
     vector mat(k, (u8)0);
     vector<bool> verif(n * m, false);
     for (auto& el : mat) {
