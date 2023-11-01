@@ -1,5 +1,4 @@
-// I DON'T KNOW IF IT'S BETTER THAN DEFAULT A* (it's faster on some cases, slower on others)
-// I DON'T KNOW IF IT ALWAYS GETS OPTIMAL RESULTS (i put a +2 on the max_depth, so it SHOULD be optimal)
+// MEET IN THE MIDDLE GETS NON-OPTIMAL RESULTS (BUT GOOD ONES)!
 
 #include <bits/stdc++.h>
 using namespace std;
@@ -59,7 +58,7 @@ struct state {
     u8 dist, heu, istant_0_idx, type;
     u64 mat;
     bool operator>(const state& other) const {
-        // if (dist == other.dist) return heu > other.heu;
+        if (dist == other.dist) return heu > other.heu;
         return dist > other.dist;
     }
 };
@@ -184,11 +183,9 @@ pair<u64, vector<u64>> a_star(u64 start_mat, u64 sol) {
     q.push({heu2, heu2, (u8)(idx_zero2 << 2), 2, sol});
     moves2[sol] = {0, 0, 0xff, false};
 
-    u8 max_depth = 0xff, min_val = 0xff;
     u64 cnt = 0, mid = 0;
     while (!q.empty()) {
         state node = q.top();
-        if (node.dist > max_depth) break;
         q.pop();
         auto type = node.type;
         auto search = (type == 1) ? moves1.find(node.mat) : moves2.find(node.mat);
@@ -196,22 +193,14 @@ pair<u64, vector<u64>> a_star(u64 start_mat, u64 sol) {
             (search->second).processed = true;
             if (type == 1) {
                 if (auto check = moves2.find(node.mat); check != moves2.end() && (check->second).processed) {
-                    if (max_depth == 0xff) max_depth = node.dist + 2;
-                    u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                    if (tmp < min_val) {
-                        min_val = tmp;
-                        mid = node.mat;
-                    }
+                    mid = node.mat;
+                    break;
                 }
                 process(col1, row1, q, node, type, moves1);
             } else {
                 if (auto check = moves1.find(node.mat); check != moves1.end() && (check->second).processed) {
-                    if (max_depth == 0xff) max_depth = node.dist + 2;
-                    u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                    if (tmp < min_val) {
-                        min_val = tmp;
-                        mid = node.mat;
-                    }
+                    mid = node.mat;
+                    break;
                 }
                 process(col2, row2, q, node, type, moves2);
             }

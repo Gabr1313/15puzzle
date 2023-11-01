@@ -1,4 +1,6 @@
 #include <bits/stdc++.h>
+
+#include <cassert>
 using namespace std;
 
 template <typename T, typename S>
@@ -42,6 +44,7 @@ void _dbg(Head H, Tail... T) {
 
 using u8 = unsigned char;
 using ull = unsigned long long;
+using vi = vector<int>;
 
 #define SZ 16
 #define ROW 4
@@ -56,8 +59,9 @@ struct state {
     u8 dist, heu, istant_0_idx;
     ull mat;
     bool operator>(const state& other) const {
-        if (dist == other.dist) return heu > other.heu;
-        return dist > other.dist;
+        return heu > other.heu;
+        /* if (dist == other.dist) return heu > other.heu;
+        return dist > other.dist; */
     }
 };
 
@@ -81,16 +85,22 @@ inline void try_insert(priority_queue<state, vector<state>, std::greater<state>>
     u8 heu = node.heu + diff;
     u8 dist = node.dist + diff + 1;
     auto search = moves.find(new_mat);
-    if (search == moves.end() || dist < (search->second).dist) {
+    if ((search == moves.end() || dist < (search->second).dist) && !moves[new_mat].processed) {
         moves[new_mat] = {dist, k, false};
         q.push({dist, heu, k2, new_mat});
     }
 }
 
-ull a_star(ull start_mat, ull finish, unordered_map<ull, memo>& moves) {
+// write a better one
+// first 1 2 3 4
+// than 5 9 13
+// than 6 7 8
+// than 10 11 12
+// than 14 15
+ull get_a_solution(ull start_mat, ull sol, unordered_map<ull, memo>& moves) {
     ull col = 0, row = 0;
     for (ull i = 0; i < SZ; i++) {
-        u8 val = (finish >> (i << 2)) & 15;
+        u8 val = (sol >> (i << 2)) & 15;
         col |= ((i & 3) << (val << 2));
         row |= ((i >> 2) << (val << 2));
     }
@@ -142,7 +152,7 @@ ull a_star(ull start_mat, ull finish, unordered_map<ull, memo>& moves) {
             try_insert(q, node, k, k2, diff, node_value, moves);
         }
     }
-    assert(false);
+    return cnt;
 }
 
 vector<ull> solution(ull start, ull end, unordered_map<ull, memo>& moves) {
@@ -186,6 +196,55 @@ bool is_solvable(ull mat) {
     else return inv_count & 1;
 }
 
+const double BOLTZMAN = 0.01;
+const double INIT_TEMP = 1;
+
+const double COOLIGN_FRACTION = 0.97;  // up-down together
+const ull COOLIGN_STEP = 50 * 2;            // up-down together
+const ull STEP_PER_TEMP = 100 * 2;          // up-down together
+/* const double COOLIGN_FRACTION = 0.97;  // up-down together
+const ull COOLIGN_STEP = 500;          // up-down together
+const ull STEP_PER_TEMP = 1000;        // up-down together */
+// const double COOLIGN_FRACTION = 0.999;  // up-down together
+// const ull COOLIGN_STEP = 5000;          // up-down together
+// const ull STEP_PER_TEMP = 10000;        // up-down together
+
+pair<ull, vector<ull>> anneal_tsp(ull start_mat) {
+    unordered_map<ull, memo> moves;
+    ull sol = 0x0fedcba987654321;
+    auto processed = get_a_solution(start_mat, sol, moves);
+    auto v = solution(start_mat, sol, moves);
+    srand(time(NULL));
+    double temperature = INIT_TEMP;
+    for (int i = 0; i < COOLIGN_STEP; i++) {
+        int start_value = v.size();
+        double intial_temperature = temperature;
+        temperature *= COOLIGN_FRACTION;
+        for (int j = 0; j < STEP_PER_TEMP; j++) {
+            int k = rand() % v.size();
+            moves.clear();
+            auto new_processed = get_a_solution(v[k], sol, moves);
+            processed += new_processed;
+            auto new_tail = solution(v[k], sol, moves);
+            int cost = new_tail.size() + k - v.size();
+            if (cost < 0) {
+                for (int i = k, tmp = v.size(); i < tmp; i++) v.pop_back();
+                v.insert(v.end(), new_tail.begin(), new_tail.end());
+                continue;
+            }
+            double e = -cost / (v.size() * BOLTZMAN * temperature);
+            double merit = exp(e);
+            float flip = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+            if (merit > flip) {
+                for (int i = k, tmp = v.size(); i < tmp; i++) v.pop_back();
+                v.insert(v.end(), new_tail.begin(), new_tail.end());
+            }
+        }
+        if (v.size() - start_value < 0) temperature = intial_temperature;
+    }
+    return {processed, v};
+}
+
 int main() {
     int n, m;
     cin >> n >> m;
@@ -200,16 +259,13 @@ int main() {
         mat += (x << (i << 2));
     }
     assert(is_solvable(mat));
-    ull finish = 0x0fedcba987654321;
 
-    unordered_map<ull, memo> moves;
     using namespace std::chrono;
     auto start = high_resolution_clock::now();
-    auto processed = a_star(mat, finish, moves);
+    auto [processed, sol] = anneal_tsp(mat);
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
-    auto sol = solution(mat, finish, moves);
-    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
+    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " position processed)" << endl;
 
     /* for (ull t = 0; t < sol.size(); t++) {
         for (int i = 0; i < SZ; i++) {
@@ -224,7 +280,7 @@ int main() {
                 for (int i = 0; i < n; i++) cout << "\x1b[A";
             std::this_thread::sleep_for(std::chrono::milliseconds(250));
         }
-    }  */
+    } */
 
     return 0;
 }
