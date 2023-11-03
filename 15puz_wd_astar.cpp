@@ -316,7 +316,7 @@ int main() {
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
     auto sol = get_solution(mat, finish, moves);
-    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
+    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different positions processed)" << endl;
 
     print_solution(sol);
     return 0;

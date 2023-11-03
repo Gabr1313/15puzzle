@@ -399,7 +399,7 @@ int main() {
     u8 ans = ida_star(mat, finish);
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
-    cout << (int)ans << " moves found in " << duration.count() << "ms (" << vis << " position processed)" << endl;
+    cout << (int)ans << " moves found in " << duration.count() << "ms (" << vis << " positions processed)" << endl;
 
     auto sol = construct_solution(mat, finish);
     print_solution(sol);

@@ -278,7 +278,7 @@ int main() {
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop - start);
 
-    cout << step.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
+    cout << step.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different positions processed)" << endl;
 
     print_solution(step);
     return 0;

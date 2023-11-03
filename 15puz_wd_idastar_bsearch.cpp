@@ -221,28 +221,24 @@ bool recur(state& st) {
     if (i > 0) {
         u8 new_blank = st.blank - COL;
         auto new_state = do_things(st, new_blank);
-        // recur(new_state);
         states[0] = new_state;
         todo[0] = true;
     }
     if (i < ROW - 1) {
         u8 new_blank = st.blank + COL;
         auto new_state = do_things(st, new_blank);
-        // recur(new_state);
         states[1] = new_state;
         todo[1] = true;
     }
     if (j > 0) {
         u8 new_blank = st.blank - 1;
         auto new_state = do_things(st, new_blank);
-        // recur(new_state);
         states[2] = new_state;
         todo[2] = true;
     }
     if (j < COL - 1) {
         u8 new_blank = st.blank + 1;
         auto new_state = do_things(st, new_blank);
-        // recur(new_state);
         states[3] = new_state;
         todo[3] = true;
     }
@@ -401,7 +397,7 @@ int main() {
     auto processed = ida_star_bsearch(mat, finish, 10e6);
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
-    cout << snapshot.size() << " moves found in " << duration.count() << "ms (" << processed << " position processed)" << endl;
+    cout << snapshot.size() << " moves found in " << duration.count() << "ms (" << processed << " positions processed)" << endl;
 
     auto sol = construct_solution(mat, finish);
     print_solution(sol);

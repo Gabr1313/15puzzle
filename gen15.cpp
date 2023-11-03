@@ -70,7 +70,7 @@ int main() {
     } while (!is_solvable(v));
     cout << "4 4" << endl;
     for (int i = 0; i < 16; i++) {
-        cout << setw(2) << (int)v[i] << " ";
+        cout << setw(3) << (int)v[i] << " ";
         if (i % 4 == 3) cout << endl;
     }
 }
