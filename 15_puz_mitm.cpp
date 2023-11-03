@@ -1,5 +1,5 @@
 // I DON'T KNOW IF IT'S BETTER THAN DEFAULT A* (it's faster on some cases, slower on others)
-// I DON'T KNOW IF IT ALWAYS GETS OPTIMAL RESULTS (i put a +2 on the max_depth, so it SHOULD be optimal)
+// DON'T KNOW IF IT ALWAYS GETS OPTIMAL RESULTS
 
 #include <bits/stdc++.h>
 using namespace std;
@@ -43,8 +43,8 @@ void _dbg(Head H, Tail... T) {
 #define dbg(...) 42
 #endif
 
-using u8 = unsigned char;
-using u64 = unsigned long long;
+using u64 = uint64_t;
+using u8 = uint8_t;
 
 #define SZ 16
 #define ROW 4
@@ -58,10 +58,6 @@ struct memo {
 struct state {
     u8 dist, heu, istant_0_idx, type;
     u64 mat;
-    bool operator>(const state& other) const {
-        // if (dist == other.dist) return heu > other.heu;
-        return dist > other.dist;
-    }
 };
 
 using pqq = priority_queue<state, vector<state>, std::greater<state>>;
@@ -111,7 +107,7 @@ vector<u64> solution(u64 mid, mapp& moves1, mapp& moves2) {
     return stak;
 }
 
-inline void try_insert(pqq& q, const state& node, u8 k, u8 k2, int diff, u8 node_value, u8 type, mapp& moves) {
+inline void try_insert(vector<state>& q, const state& node, u8 k, u8 k2, int diff, u8 node_value, u8 type, mapp& moves) {
     u64 new_mat = node.mat;
     new_mat -= (u64)node_value << k2;
     new_mat += (u64)node_value << k;
@@ -120,46 +116,46 @@ inline void try_insert(pqq& q, const state& node, u8 k, u8 k2, int diff, u8 node
     auto search = moves.find(new_mat);
     if (search == moves.end() || dist < (search->second).dist) {
         moves[new_mat] = {dist, heu, k, false};
-        q.push({dist, heu, k2, type, new_mat});
+        q.push_back({dist, heu, k2, type, new_mat});
     }
 }
 
-inline void process(u64& col, u64& row, pqq& q, state& node, u8 type, mapp& moves) {
+inline void process(u64& col, u64& row, vector<state>& q1, vector<state>& q2, state& node, mapp& moves) {
     u8 k = node.istant_0_idx, i = k >> 4, j = (k >> 2) & 3;
     if (i > 0) {
         u8 k2 = k - (COL << 2);
         u8 node_value = (node.mat >> k2) & 15;
         u8 r = (row >> (node_value << 2)) & 15;
         int diff = abs(i - r) - abs(i - 1 - r);
-        try_insert(q, node, k, k2, diff, node_value, type, moves);
+        try_insert((diff < 0 ? q1 : q2), node, k, k2, diff, node_value, node.type, moves);
     }
     if (i < ROW - 1) {
         u8 k2 = k + (COL << 2);
         u8 node_value = (node.mat >> k2) & 15;
         u8 r = (row >> (node_value << 2)) & 15;
         int diff = abs(i - r) - abs(i + 1 - r);
-        try_insert(q, node, k, k2, diff, node_value, type, moves);
+        try_insert((diff < 0 ? q1 : q2), node, k, k2, diff, node_value, node.type, moves);
     }
     if (j > 0) {
         u8 k2 = k - (1 << 2);
         u8 node_value = (node.mat >> k2) & 15;
         u8 c = (col >> (node_value << 2)) & 15;
         int diff = abs(j - c) - abs(j - 1 - c);
-        try_insert(q, node, k, k2, diff, node_value, type, moves);
+        try_insert((diff < 0 ? q1 : q2), node, k, k2, diff, node_value, node.type, moves);
     }
     if (j < COL - 1) {
         u8 k2 = k + (1 << 2);
         u8 node_value = (node.mat >> k2) & 15;
         u8 c = (col >> (node_value << 2)) & 15;
         int diff = abs(j - c) - abs(j + 1 - c);
-        try_insert(q, node, k, k2, diff, node_value, type, moves);
+        try_insert((diff < 0 ? q1 : q2), node, k, k2, diff, node_value, node.type, moves);
     }
 }
 
-pair<u64, vector<u64>> a_star(u64 start_mat, u64 sol) {
+pair<u64, vector<u64>> a_star(u64 start_mat, u64 end_mat) {
     u64 col1 = 0, row1 = 0, col2 = 0, row2 = 0;
     for (u64 i = 0; i < SZ; i++) {
-        u8 val = (sol >> (i << 2)) & 15;
+        u8 val = (end_mat >> (i << 2)) & 15;
         col1 |= ((i & 3) << (val << 2));
         row1 |= ((i >> 2) << (val << 2));
     }
@@ -169,53 +165,54 @@ pair<u64, vector<u64>> a_star(u64 start_mat, u64 sol) {
         row2 |= ((i >> 2) << (val << 2));
     }
 
-    pqq q;
-    u8 heu1 = heuristic(start_mat, col1, row1), heu2 = heuristic(sol, col2, row2);
+    vector<state> q1, q2;
+    u8 heu = heuristic(start_mat, col1, row1);
     u8 idx_zero1, idx_zero2;
     mapp moves1, moves2;
 
     for (idx_zero1 = 0; idx_zero1 < SZ; idx_zero1++)
         if ((start_mat >> (idx_zero1 << 2) & 15) == 0) break;
-    q.push({heu1, heu1, (u8)(idx_zero1 << 2), 1, start_mat});
-    moves1[start_mat] = {0, 0, 0xff, false};
+    q1.push_back({heu, heu, (u8)(idx_zero1 << 2), 1, start_mat});
+    moves1[start_mat] = {heu, heu, 0xff, false};
 
     for (idx_zero2 = 0; idx_zero2 < SZ; idx_zero2++)
-        if ((sol >> (idx_zero2 << 2) & 15) == 0) break;
-    q.push({heu2, heu2, (u8)(idx_zero2 << 2), 2, sol});
-    moves2[sol] = {0, 0, 0xff, false};
+        if ((end_mat >> (idx_zero2 << 2) & 15) == 0) break;
+    q1.push_back({heu, heu, (u8)(idx_zero2 << 2), 2, end_mat});
+    moves2[end_mat] = {heu, heu, 0xff, false};
 
     u8 max_depth = 0xff, min_val = 0xff;
     u64 cnt = 0, mid = 0;
-    while (!q.empty()) {
-        state node = q.top();
+    while (true) {
+        if (q1.empty()) swap(q1, q2);
+        if (q1.empty()) break;
+        state node = q1.back();
         if (node.dist > max_depth) break;
-        q.pop();
+        q1.pop_back();
         auto type = node.type;
         auto search = (type == 1) ? moves1.find(node.mat) : moves2.find(node.mat);
-        if (!(search->second).processed) {
-            (search->second).processed = true;
-            if (type == 1) {
-                if (auto check = moves2.find(node.mat); check != moves2.end() && (check->second).processed) {
-                    if (max_depth == 0xff) max_depth = node.dist + 2;
-                    u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                    if (tmp < min_val) {
-                        min_val = tmp;
-                        mid = node.mat;
-                    }
+        if ((search->second).processed) continue;
+        (search->second).processed = true;
+        cnt++;
+        if (type == 1) {
+            if (auto check = moves2.find(node.mat); check != moves2.end() && (check->second).processed) {
+                if (max_depth == 0xff) max_depth = node.dist + 2;
+                u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
+                if (tmp < min_val) {
+                    min_val = tmp;
+                    mid = node.mat;
                 }
-                process(col1, row1, q, node, type, moves1);
-            } else {
-                if (auto check = moves1.find(node.mat); check != moves1.end() && (check->second).processed) {
-                    if (max_depth == 0xff) max_depth = node.dist + 2;
-                    u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                    if (tmp < min_val) {
-                        min_val = tmp;
-                        mid = node.mat;
-                    }
-                }
-                process(col2, row2, q, node, type, moves2);
             }
-            cnt++;
+            process(col1, row1, q1, q2, node, moves1);
+        } else {
+            if (auto check = moves1.find(node.mat); check != moves1.end() && (check->second).processed) {
+                if (max_depth == 0xff) max_depth = node.dist + 2;
+                u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
+                if (tmp < min_val) {
+                    min_val = tmp;
+                    mid = node.mat;
+                }
+            }
+            process(col2, row2, q1, q2, node, moves2);
         }
     }
     assert(mid);
@@ -243,6 +240,22 @@ bool is_solvable(u64 mat) {
     else return inv_count & 1;
 }
 
+void print_solution(vector<u64>& sol, bool erase = true) {
+    for (u64 t = 0; t < sol.size(); t++) {
+        for (int i = 0; i < SZ; i++) {
+            u8 el = (sol[t] >> (i << 2)) & 15;
+            if (el) cout << setw(3) << (int)el << " ";
+            else cout << "    ";
+            if (i % COL == COL - 1) cout << endl;
+        }
+        if (erase) {
+            if (t < sol.size() - 1)
+                for (int i = 0; i < ROW; i++) cout << "\x1b[A";
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        } else cout << endl;
+    }
+}
+
 int main() {
     int n, m;
     cin >> n >> m;
@@ -267,20 +280,6 @@ int main() {
 
     cout << step.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
 
-    /* for (ull t = 0; t < step.size(); t++) {
-        for (int i = 0; i < SZ; i++) {
-            u8 el = (step[t] >> (i << 2)) & 15;
-            if (el) cout << setw(3) << (int)el << " ";
-            else cout << "    ";
-            if (i % 4 == 3) cout << endl;
-        }
-        {
-            // cout << endl;
-            if (t < step.size() - 1)
-                for (int i = 0; i < n; i++) cout << "\x1b[A";
-            std::this_thread::sleep_for(std::chrono::milliseconds(250));
-        }
-    }  */
-
+    // print_solution(step);
     return 0;
 }
