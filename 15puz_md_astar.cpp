@@ -64,7 +64,7 @@ struct state {
 using pq = priority_queue<state, vector<state>, std::greater<state>>;
 using hm = unordered_map<u64, memo>;
 
-inline u8 heuristic(u64 mat, u64 col, u64 row) {
+inline u8 manhattan(u64 mat, u64 col, u64 row) {
     int sum = 0;
     for (u8 k = 0; k < SZ; k++) {
         int el = (mat >> (k << 2)) & 15;
@@ -81,7 +81,7 @@ inline void try_insert(pq& q, const state& node, u8 k, u8 k2, hm& moves, u64 col
     u64 new_mat = node.mat;
     new_mat -= (u64)node_value << k2;
     new_mat += (u64)node_value << k;
-    u8 heu = heuristic(new_mat, col, row);
+    u8 heu = manhattan(new_mat, col, row);
     u8 dist = node.dist - node.heu + heu + 1;
     auto search = moves.find(new_mat);
     if (search == moves.end() || dist < (search->second).dist) {
@@ -99,7 +99,7 @@ u64 a_star(u64 start, u64 finish, hm& moves) {
     }
 
     pq q;
-    u8 heu = heuristic(start, col, row);
+    u8 heu = manhattan(start, col, row);
     u8 idx_zero;
     for (idx_zero = 0; idx_zero < SZ; idx_zero++)
         if ((start >> (idx_zero << 2) & 15) == 0) break;
@@ -218,6 +218,6 @@ int main() {
     auto sol = get_solution(mat, finish, moves);
     cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
 
-    // print_solution(sol);
+    print_solution(sol);
     return 0;
 }

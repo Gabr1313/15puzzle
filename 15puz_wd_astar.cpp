@@ -1,5 +1,3 @@
-// EXTREMELY SLOW
-
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -43,6 +41,7 @@ void _dbg(Head H, Tail... T) {
 #endif
 
 using u8 = uint8_t;
+using u16 = uint16_t;
 using u64 = uint64_t;
 
 #define SZ 16
@@ -50,12 +49,12 @@ using u64 = uint64_t;
 #define COL 4
 
 struct memo {
-    u8 dist, blank_prec, heu;
+    u8 dist, blank_prec;
     bool processed;
 };
 
 struct state {
-    u8 dist, heu, blank, type;
+    u8 dist, heu, blank;
     u64 mat;
     bool operator>(const state& other) const {
         if (dist == other.dist) return heu > other.heu;
@@ -72,51 +71,29 @@ using pq = priority_queue<state, vector<state>, std::greater<state>>;
 using hm = unordered_map<u64, memo>;
 using table = unordered_map<u64, u8>;
 
-vector<u64> solution(u64 mid, hm& moves1, hm& moves2) {
-    vector<u64> stak;
-    stak.push_back(mid);
-    u64 mat = mid;
-    u8 idx, tmp;
-    for (idx = 0; idx < SZ; idx++)
-        if ((mid >> (idx << 2) & 15) == 0) break;
-    tmp = (idx <<= 2);
-
-    while (true) {
-        auto idx_next = moves1[mat].blank_prec;
-        if (idx_next == 0xff) break;
-        u64 el = (mat >> idx_next) & 15;
-        mat &= ~(15ull << idx_next);
-        mat |= (el << idx);
-        stak.push_back(mat);
-        idx = idx_next;
+unordered_map<u16, u16> sort_table;
+inline void fast_sort(u64& v, u8 i) {
+    u16 row = (v >> (i << 4)) & 0xffff;
+    v &= ~(u64(0xffff) << (i << 4));
+    if (auto ptr = sort_table.find(row); ptr != sort_table.end()) {
+        v += (u64(ptr->second) << (i << 4));
+        return;
     }
-    reverse(stak.begin(), stak.end());
-    idx = tmp, mat = mid;
-    while (true) {
-        auto idx_next = moves2[mat].blank_prec;
-        if (idx_next == 0xff) break;
-        u64 el = (mat >> idx_next) & 15;
-        mat &= ~(15ull << idx_next);
-        mat |= (el << idx);
-        stak.push_back(mat);
-        idx = idx_next;
-    }
-    return stak;
-}
-
-void bubble_sort(u64& v, u8 i) {
-    for (u8 k = (i << 2); k < ((i + 1) << 2); k++) {
-        for (u8 j = (i << 2); j < ((i + 1) << 2) - 1; j++) {
-            u64 el1 = (v >> (j << 2)) & 15;
-            u64 el2 = (v >> ((j + 1) << 2)) & 15;
+    auto old_row = row;
+    for (u8 k = 0; k < 4; k++) {
+        for (u8 j = 0; j < 3 - k; j++) {
+            u64 el1 = (row >> (j << 2)) & 15;
+            u64 el2 = (row >> ((j + 1) << 2)) & 15;
             if (el1 > el2) {
-                v -= el1 << (j << 2);
-                v -= el2 << ((j + 1) << 2);
-                v += el1 << ((j + 1) << 2);
-                v += el2 << (j << 2);
+                row &= ~(15 << (j << 2));
+                row &= ~(15 << ((j + 1) << 2));
+                row += el1 << ((j + 1) << 2);
+                row += el2 << (j << 2);
             }
         }
     }
+    sort_table[old_row] = row;
+    v += (u64(row) << (i << 4));
 }
 
 u64 transpose(u64 mat) {
@@ -154,7 +131,7 @@ u64 map_col(u64 mat) {
 table generate_table(u64 start) {
     u8 blank_row;
     for (u8 i = 0; i < COL; i++) {
-        bubble_sort(start, i);
+        fast_sort(start, i);
         if ((start >> (i << 4) & 15) == 0) blank_row = i;
     }
 
@@ -171,8 +148,8 @@ table generate_table(u64 start) {
                 u64 new_v = v;
                 new_v -= el << (k << 2);
                 new_v += el << (blank_row << 4);
-                bubble_sort(new_v, blank_row);
-                bubble_sort(new_v, blank_row - 1);
+                fast_sort(new_v, blank_row);
+                fast_sort(new_v, blank_row - 1);
                 if (tab.find(new_v) == tab.end()) {
                     tab[new_v] = dist + 1;
                     q.push_back({u8(dist + 1), u8(blank_row - 1), new_v});
@@ -185,8 +162,8 @@ table generate_table(u64 start) {
                 u64 new_v = v;
                 new_v -= el << (k << 2);
                 new_v += el << (blank_row << 4);
-                bubble_sort(new_v, blank_row);
-                bubble_sort(new_v, blank_row + 1);
+                fast_sort(new_v, blank_row);
+                fast_sort(new_v, blank_row + 1);
                 if (tab.find(new_v) == tab.end()) {
                     tab[new_v] = dist + 1;
                     q.push_back({u8(dist + 1), u8(blank_row + 1), new_v});
@@ -197,110 +174,85 @@ table generate_table(u64 start) {
     return tab;
 }
 
-inline u8 heuristic(u64 mat, table& tab_row, table& tab_col) {
+inline u8 walking_distance(u64 mat, table& tab_row, table& tab_col) {
     u64 tmp1 = map_row(mat), tmp2 = map_col(mat);
-    for (u8 i = 0; i < COL; i++) bubble_sort(tmp1, i), bubble_sort(tmp2, i);
-    assert(tab_row.find(tmp1) != tab_row.end() && tab_col.find(tmp2) != tab_col.end());
+    for (u8 i = 0; i < COL; i++) fast_sort(tmp1, i), fast_sort(tmp2, i);
     return tab_row[tmp1] + tab_col[tmp2];
 }
 
-inline void try_insert(vector<state>& q1, vector<state>& q2, const state& node, u8 k, u8 k2, hm& moves, table& tab_row, table& tab_col) {
+inline void try_insert(pq& q, const state& node, u8 k, u8 k2, hm& moves, table& tab_row, table& tab_col) {
     u8 node_value = (node.mat >> k2) & 15;
     u64 new_mat = node.mat;
     new_mat -= (u64)node_value << k2;
     new_mat += (u64)node_value << k;
-    u8 heu = heuristic(new_mat, tab_row, tab_col);
+    u8 heu = walking_distance(new_mat, tab_row, tab_col);
     u8 dist = node.dist - node.heu + heu + 1;
-    assert(abs((node.heu) - heu) <= 1);
     auto search = moves.find(new_mat);
     if (search == moves.end() || dist < (search->second).dist) {
         moves[new_mat] = {dist, k, false};
-        if (dist == node.dist) q1.push_back({dist, heu, k2, node.type, new_mat});
-        else q2.push_back({dist, heu, k2, node.type, new_mat});
+        q.push({dist, heu, k2, new_mat});
     }
 }
 
-inline void process(vector<state>& q1, vector<state>& q2, state& node, hm& moves, table& tab_row, table& tab_col) {
-    u8 k = node.blank, i = k >> 4, j = (k >> 2) & 3;
-    if (i > 0) {
-        u8 k2 = k - (COL << 2);
-        try_insert(q1, q2, node, k, k2, moves, tab_row, tab_col);
-    }
-    if (i < ROW - 1) {
-        u8 k2 = k + (COL << 2);
-        try_insert(q1, q2, node, k, k2, moves, tab_row, tab_col);
-    }
-    if (j > 0) {
-        u8 k2 = k - (1 << 2);
-        try_insert(q1, q2, node, k, k2, moves, tab_row, tab_col);
-    }
-    if (j < COL - 1) {
-        u8 k2 = k + (1 << 2);
-        try_insert(q1, q2, node, k, k2, moves, tab_row, tab_col);
-    }
-}
+u64 a_star(u64 start, u64 finish, hm& moves, table& tab_row, table& tab_col) {
+    pq q;
+    u8 heu = walking_distance(start, tab_row, tab_col);
+    u8 blank_start;
+    for (blank_start = 0; blank_start < SZ; blank_start++)
+        if ((start >> (blank_start << 2) & 15) == 0) break;
+    blank_start <<= 2;
+    q.push({heu, heu, blank_start, start});
+    moves[start] = {0, 0xff, false};
 
-pair<u64, vector<u64>> a_star(u64 start, u64 finish) {
-    hm moves1, moves2;
-    table tab1_row = generate_table(map_row(finish));
-    table tab1_col = generate_table(map_col(finish));
-    table tab2_row = generate_table(map_row(start));
-    table tab2_col = generate_table(map_col(start));
-
-    vector<state> q1, q2;
-    u8 heu = heuristic(start, tab1_row, tab1_col);
-    u8 blank1_start, blank2_start;
-
-    for (blank1_start = 0; blank1_start < SZ; blank1_start++)
-        if ((start >> (blank1_start << 2) & 15) == 0) break;
-    blank1_start <<= 2;
-    q1.push_back({heu, heu, blank1_start, 1, start});
-    moves1[start] = {0, 0xff, false};
-
-    for (blank2_start = 0; blank2_start < SZ; blank2_start++)
-        if ((finish >> (blank2_start << 2) & 15) == 0) break;
-    blank2_start <<= 2;
-    q1.push_back({heu, heu, blank2_start, 2, finish});
-    moves2[finish] = {0, 0xff, false};
-
-    u8 max_depth = 0xff, min_val = 0xff;
-    u64 cnt = 0, mid = 0;
-    while (true) {
-        if (q1.empty()) swap(q1, q2);
-        if (q1.empty()) break;
-        auto node = q1.back();
-        if (node.dist > max_depth) break;
-        q1.pop_back();
-        auto type = node.type;
-        auto search = (type == 1) ? moves1.find(node.mat) : moves2.find(node.mat);
+    u64 cnt = 0;
+    while (!q.empty()) {
+        auto node = q.top();
+        q.pop();
+        auto search = moves.find(node.mat);
         if ((search->second).processed) continue;
-        (search->second).processed = true;
+        else (search->second).processed = true;
         cnt++;
-        if (type == 1) {
-            if (auto check = moves2.find(node.mat); check != moves2.end() && (check->second).processed) {
-                if (max_depth == 0xff) max_depth = node.dist + 2;
-                u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                if (tmp < min_val) {
-                    min_val = tmp;
-                    mid = node.mat;
-                }
-            }
-            process(q1, q2, node, moves1, tab1_row, tab1_col);
-        } else {
-            if (auto check = moves1.find(node.mat); check != moves1.end() && (check->second).processed) {
-                if (max_depth == 0xff) max_depth = node.dist + 2;
-                u8 tmp = (search->second).dist + (check->second).dist - (search->second).heu - (check->second).heu;
-                if (tmp < min_val) {
-                    min_val = tmp;
-                    mid = node.mat;
-                }
-            }
-            process(q1, q2, node, moves2, tab2_row, tab2_col);
+        if (node.mat == finish) return cnt;
+        u8 k = node.blank, i = k >> 4, j = (k >> 2) & 3;
+        if (i > 0) {
+            u8 k2 = k - (COL << 2);
+            try_insert(q, node, k, k2, moves, tab_row, tab_col);
+        }
+        if (i < ROW - 1) {
+            u8 k2 = k + (COL << 2);
+            try_insert(q, node, k, k2, moves, tab_row, tab_col);
+        }
+        if (j > 0) {
+            u8 k2 = k - (1 << 2);
+            try_insert(q, node, k, k2, moves, tab_row, tab_col);
+        }
+        if (j < COL - 1) {
+            u8 k2 = k + (1 << 2);
+            try_insert(q, node, k, k2, moves, tab_row, tab_col);
         }
     }
-    assert(mid);
-    auto step = solution(mid, moves1, moves2);
-    return {cnt, step};
+    assert(false);
+}
+
+vector<u64> get_solution(u64 start, u64 end, hm& moves) {
+    vector<u64> stak;
+    stak.push_back(end);
+    u64 mat = end;
+    u8 idx, tmp;
+    for (idx = 0; idx < SZ; idx++)
+        if ((end >> (idx << 2) & 15) == 0) break;
+    tmp = (idx <<= 2);
+
+    while (mat != start) {
+        auto idx_next = moves[mat].blank_prec;
+        u64 el = (mat >> idx_next) & 15;
+        mat &= ~(15ull << idx_next);
+        mat |= (el << idx);
+        stak.push_back(mat);
+        idx = idx_next;
+    }
+    reverse(stak.begin(), stak.end());
+    return stak;
 }
 
 bool is_solvable(u64 mat) {
@@ -354,13 +306,18 @@ int main() {
     }
     assert(is_solvable(mat));
     u64 finish = 0x0fedcba987654321;
+    table tab_row = generate_table(map_row(finish));
+    table tab_col = generate_table(map_col(finish));
+    hm moves;
+
     using namespace std::chrono;
     auto start_time = high_resolution_clock::now();
-    auto [processed, step] = a_star(mat, finish);
+    auto processed = a_star(mat, finish, moves, tab_row, tab_col);
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
-    cout << step.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
+    auto sol = get_solution(mat, finish, moves);
+    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
 
-    // print_solution(step);
+    print_solution(sol);
     return 0;
 }

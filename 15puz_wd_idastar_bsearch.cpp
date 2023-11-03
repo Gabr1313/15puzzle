@@ -167,20 +167,19 @@ table generate_table(u64 start) {
     return tab;
 }
 
-inline u8 heuristic(u64 mat, u64 map_r, u64 map_c, table& tab_row, table& tab_col) {
+inline u8 walking_distance(u64 mat, u64 map_r, u64 map_c, table& tab_row, table& tab_col) {
     for (u8 i = 0; i < 4; i++) fast_sort(map_r, i), fast_sort(map_c, i);
     return tab_row[map_r] + tab_col[map_c];
 }
 
 table tab_row, tab_col;
 unordered_set<u64> visited, snapshot;
+u64 finish, vis, max_step;
 u8 max_dist;
-u64 finish, cnt;
 
 struct state {
     u64 mat, map_r, map_c;
     u8 blank, heu, dist;
-    bool operator<(const state& other) const { return dist > other.dist; }
 };
 
 inline state do_things(state st, u8 new_blank) {
@@ -200,22 +199,22 @@ inline state do_things(state st, u8 new_blank) {
     new_map_c -= node_value_c << (conv_transpose[new_blank] << 2);
     new_map_c += node_value_c << (conv_transpose[st.blank] << 2);
 
-    u8 new_heu = heuristic(new_mat, new_map_r, new_map_c, tab_row, tab_col);
+    u8 new_heu = walking_distance(new_mat, new_map_r, new_map_c, tab_row, tab_col);
     u8 new_dist = st.dist - st.heu + new_heu + 1;
     return {new_mat, new_map_r, new_map_c, new_blank, new_heu, new_dist};
 }
 
-void recur(state& st) {
-    if (st.dist >= max_dist || visited.count(st.mat)) return;
+bool recur(state& st) {
+    if (st.dist >= max_dist || visited.count(st.mat)) return false;
     if (st.mat == finish) {
         if (st.dist < max_dist) {
             max_dist = st.dist;
             snapshot = visited;
         }
-        return;
+        return true;
     }
     visited.insert(st.mat);
-    cnt++;
+    if (++vis > max_step) return false;
     state states[4];
     bool todo[4] = {false, false, false, false};
     u8 i = st.blank >> 2, j = st.blank & 3;
@@ -249,27 +248,47 @@ void recur(state& st) {
     }
 
     for (u8 k = 0; k < 4; k++)
-        if (todo[k] && states[k].dist == st.dist) recur(states[k]);
+        if (todo[k] && states[k].dist == st.dist)
+            if (recur(states[k])) return true;
     for (u8 k = 0; k < 4; k++)
-        if (todo[k] && states[k].dist != st.dist) recur(states[k]);
-
+        if (todo[k] && states[k].dist != st.dist)
+            if (recur(states[k])) return true;
     visited.erase(st.mat);
-    return;
+    return false;
 }
 
-u8 ida_star(u64 start, u64 fin) {
-    finish = fin, cnt = 0, max_dist = 82;
+u64 ida_star_bsearch(u64 start, u64 fin, u64 max_step_per_search) {
+    finish = fin, max_step = max_step_per_search;
     auto map_r = map_row(start), map_c = map_col(start);
     tab_row = generate_table(map_row(finish));
     tab_col = generate_table(map_col(finish));
-    auto heu = heuristic(start, map_r, map_c, tab_row, tab_col);
-    unordered_set<u64> visited;
+    auto heu = walking_distance(start, map_r, map_c, tab_row, tab_col);
     u8 blank;
     for (blank = 0; blank < SZ; blank++)
         if ((start >> (blank << 2) & 15) == 0) break;
     state st = {start, map_r, map_c, blank, heu, heu};
-    recur(st);
-    return snapshot.size();
+
+    u64 total_cnt = 0;
+
+    max_dist = 1;
+    while (!recur(st)) {
+        max_dist *= 2;
+        vis = 0;
+        visited.clear();
+    }
+
+    u8 lo = max_dist >> 1, hi = max_dist;
+    while (lo != hi) {
+        u8 mid = (lo + hi) >> 1;
+        max_dist = mid;
+        vis = 0;
+        visited.clear();
+        if (recur(st)) hi = mid;
+        else lo = mid + 1;
+        total_cnt += vis;
+    }
+
+    return total_cnt;
 }
 
 bool is_solvable(u64 mat) {
@@ -379,12 +398,12 @@ int main() {
 
     using namespace std::chrono;
     auto start_time = high_resolution_clock::now();
-    u8 ans = ida_star(mat, finish);
+    auto processed = ida_star_bsearch(mat, finish, 10e6);
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
-    cout << (int)ans << " moves found in " << duration.count() << "ms (" << cnt << " different position processed)" << endl;
+    cout << snapshot.size() << " moves found in " << duration.count() << "ms (" << processed << " position processed)" << endl;
 
     auto sol = construct_solution(mat, finish);
-    // print_solution(sol);
+    print_solution(sol);
     return 0;
 }

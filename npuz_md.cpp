@@ -64,7 +64,7 @@ struct MatrixHasher {
 
 unordered_map<vu8, pair<int, u8>, MatrixHasher> moves;
 
-int heuristic(vu8& mat, u8 row, u8 col) {
+int manhattan(vu8& mat, u8 row, u8 col) {
     int sum = 0;
     for (u8 i = 0, k = 0; i < row; i++) {
         for (u8 j = 0; j < col; j++, k++) {
@@ -100,7 +100,7 @@ void try_insert(priority_queue<state, vector<state>, myComp>& q, const state& no
 int a_star(vu8& start, u8 row, u8 col) {
     priority_queue<state, vector<state>, myComp> q;
     {
-        int heu = heuristic(start, row, col);
+        int heu = manhattan(start, row, col);
         int k;
         for (k = 0; k < start.size(); k++)
             if (start[k] == 0) break;
@@ -158,6 +158,23 @@ vector<vector<u8>> solution(int row, int col, int step) {
     return stak;
 }
 
+void print_solution(int n, int m, int& step, bool erase = true) {
+    auto sol = solution(n, m, step);
+    for (int t = 0; t < sol.size(); t++) {
+        for (int i = 0, k = 0; i < n; i++) {
+            for (int j = 0; j < m; j++, k++)
+                if (sol[t][k]) cout << setw(3) << (int)sol[t][k] << " ";
+                else cout << "    ";
+            cout << endl;
+        }
+        if (erase) {
+            if (t < sol.size() - 1)
+                for (int i = 0; i < n; i++) cout << "\x1b[A";
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        } else cout << endl;
+    }
+}
+
 int main() {
     int n, m, k;
     cin >> n >> m;
@@ -180,24 +197,6 @@ int main() {
     auto duration = duration_cast<milliseconds>(stop - start);
     cout << step << " moves found in " << duration.count() << "ms" << endl;
 
-    cout << step << endl;
-    if (step != -1) {
-        auto sol = solution(n, m, step);
-        for (int t = 0; t < sol.size(); t++) {
-            for (int i = 0, k = 0; i < n; i++) {
-                for (int j = 0; j < m; j++, k++)
-                    if (sol[t][k]) cout << setw(3) << (int)sol[t][k] << " ";
-                    else cout << "    ";
-                cout << endl;
-            }
-            {
-                // cout << endl;
-                if (t < sol.size() - 1)
-                    for (int i = 0; i < n; i++) cout << "\x1b[A";
-                std::this_thread::sleep_for(std::chrono::milliseconds(250));
-            }
-        }
-    }
-
+    if (step != -1) print_solution(n, m, step);
     return 0;
 }

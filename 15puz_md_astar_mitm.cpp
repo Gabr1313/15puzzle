@@ -63,7 +63,7 @@ struct state {
 using pqq = priority_queue<state, vector<state>, std::greater<state>>;
 using mapp = unordered_map<u64, memo>;
 
-inline u8 heuristic(u64 mat, u64 col, u64 row) {
+inline u8 manhattan(u64 mat, u64 col, u64 row) {
     int sum = 0;
     for (u8 k = 0; k < SZ; k++) {
         int el = (mat >> (k << 2)) & 15;
@@ -166,7 +166,7 @@ pair<u64, vector<u64>> a_star(u64 start_mat, u64 end_mat) {
     }
 
     vector<state> q1, q2;
-    u8 heu = heuristic(start_mat, col1, row1);
+    u8 heu = manhattan(start_mat, col1, row1);
     u8 idx_zero1, idx_zero2;
     mapp moves1, moves2;
 
@@ -280,6 +280,6 @@ int main() {
 
     cout << step.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
 
-    // print_solution(step);
+    print_solution(step);
     return 0;
 }

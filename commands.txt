@@ -1,0 +1,9 @@
+g++ gen15.cpp -Ofast -o gen15
+g++ 15puz_md_astar.cpp -Ofast -o md_a
+g++ 15puz_md_astar_mitm.cpp -Ofast -o md_a_mitm
+g++ 15puz_wd_astar.cpp -Ofast -o wd_a
+g++ 15puz_wd_idastar_bsearch.cpp -Ofast -o wd_ida_bsearch
+g++ 15puz_wd_idastar.cpp -Ofast -o wd_ida
+g++ npuz_md.cpp -Ofast -o npuz_md
+
+./gen15 >input/in2.txt && cat input/in2.txt && ./wd_ida_bsearch <input/in2.txt && ./wd_ida <input/in2.txt && ./wd_a <input/in2.txt && ./md_a_mitm <input/in2.txt && ./md_a <input/in2.txt && ./npuz_md <input/in2.txt

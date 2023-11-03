@@ -36,9 +36,15 @@ void _dbg(Head H, Tail... T) {
         cerr << "[" << #__VA_ARGS__ << "]: "; \
         _dbg(__VA_ARGS__);                    \
     } while (0)
+
+#define dbg_mat(mat) \
+    for (u8 k = 0; k < SZ;) dbg((mat >> (k++ << 2)) & 15, (mat >> (k++ << 2)) & 15, (mat >> (k++ << 2)) & 15, (mat >> (k++ << 2)) & 15);
 #else
 #define dbg(...) 42
+#define dbg_mat(...) 42
 #endif
+
+#define CLEVER
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -53,22 +59,11 @@ struct memo {
     bool processed;
 };
 
-struct state {
-    u8 dist, heu, blank;
-    u64 mat;
-    bool operator>(const state& other) const {
-        if (dist == other.dist) return heu > other.heu;
-        return dist > other.dist;
-    }
-};
-
 struct table_memo {
     u8 dist, blank;
     u64 state;
 };
 
-using pq = priority_queue<state, vector<state>, std::greater<state>>;
-using hm = unordered_map<u64, memo>;
 using table = unordered_map<u64, u8>;
 
 unordered_map<u16, u16> sort_table;
@@ -174,85 +169,124 @@ table generate_table(u64 start) {
     return tab;
 }
 
-inline u8 heuristic(u64 mat, table& tab_row, table& tab_col) {
-    u64 tmp1 = map_row(mat), tmp2 = map_col(mat);
-    for (u8 i = 0; i < COL; i++) fast_sort(tmp1, i), fast_sort(tmp2, i);
-    return tab_row[tmp1] + tab_col[tmp2];
+inline u8 walking_distance(u64 mat, u64 map_r, u64 map_c, table& tab_row, table& tab_col) {
+    for (u8 i = 0; i < 4; i++) fast_sort(map_r, i), fast_sort(map_c, i);
+    return tab_row[map_r] + tab_col[map_c];
 }
 
-inline void try_insert(pq& q, const state& node, u8 k, u8 k2, hm& moves, table& tab_row, table& tab_col) {
-    u8 node_value = (node.mat >> k2) & 15;
-    u64 new_mat = node.mat;
-    new_mat -= (u64)node_value << k2;
-    new_mat += (u64)node_value << k;
-    u8 heu = heuristic(new_mat, tab_row, tab_col);
-    u8 dist = node.dist - node.heu + heu + 1;
-    auto search = moves.find(new_mat);
-    if (search == moves.end() || dist < (search->second).dist) {
-        moves[new_mat] = {dist, k, false};
-        q.push({dist, heu, k2, new_mat});
-    }
+table tab_row, tab_col;
+unordered_set<u64> visited, snapshot;
+u8 max_dist;
+u64 finish, vis;
+
+struct state {
+    u64 mat, map_r, map_c;
+    u8 blank, heu, dist;
+    bool operator<(const state& other) const { return dist > other.dist; }
+};
+
+inline state do_things(state st, u8 new_blank) {
+    u8 conv_transpose[] = {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15};
+    u64 node_value = (st.mat >> (new_blank << 2)) & 15;
+    u64 new_mat = st.mat;
+    new_mat -= node_value << (new_blank << 2);
+    new_mat += node_value << (st.blank << 2);
+
+    u64 node_value_r = (st.map_r >> (new_blank << 2)) & 15;
+    u64 new_map_r = st.map_r;
+    new_map_r -= node_value_r << (new_blank << 2);
+    new_map_r += node_value_r << (st.blank << 2);
+
+    u64 node_value_c = (st.map_c >> (conv_transpose[new_blank] << 2)) & 15;
+    u64 new_map_c = st.map_c;
+    new_map_c -= node_value_c << (conv_transpose[new_blank] << 2);
+    new_map_c += node_value_c << (conv_transpose[st.blank] << 2);
+
+    u8 new_heu = walking_distance(new_mat, new_map_r, new_map_c, tab_row, tab_col);
+    u8 new_dist = st.dist - st.heu + new_heu + 1;
+    return {new_mat, new_map_r, new_map_c, new_blank, new_heu, new_dist};
 }
 
-u64 a_star(u64 start, u64 finish, hm& moves, table& tab_row, table& tab_col) {
-    pq q;
-    u8 heu = heuristic(start, tab_row, tab_col);
-    u8 blank_start;
-    for (blank_start = 0; blank_start < SZ; blank_start++)
-        if ((start >> (blank_start << 2) & 15) == 0) break;
-    blank_start <<= 2;
-    q.push({heu, heu, blank_start, start});
-    moves[start] = {0, 0xff, false};
-
-    u64 cnt = 0;
-    while (!q.empty()) {
-        auto node = q.top();
-        q.pop();
-        auto search = moves.find(node.mat);
-        if ((search->second).processed) continue;
-        else (search->second).processed = true;
-        cnt++;
-        if (node.mat == finish) return cnt;
-        u8 k = node.blank, i = k >> 4, j = (k >> 2) & 3;
-        if (i > 0) {
-            u8 k2 = k - (COL << 2);
-            try_insert(q, node, k, k2, moves, tab_row, tab_col);
+void recur(state& st) {
+    if (st.dist >= max_dist || visited.count(st.mat)) return;
+    if (st.mat == finish) {
+        if (st.dist < max_dist) {
+            max_dist = st.dist;
+            snapshot = visited;
         }
-        if (i < ROW - 1) {
-            u8 k2 = k + (COL << 2);
-            try_insert(q, node, k, k2, moves, tab_row, tab_col);
-        }
-        if (j > 0) {
-            u8 k2 = k - (1 << 2);
-            try_insert(q, node, k, k2, moves, tab_row, tab_col);
-        }
-        if (j < COL - 1) {
-            u8 k2 = k + (1 << 2);
-            try_insert(q, node, k, k2, moves, tab_row, tab_col);
-        }
+        return;
     }
-    assert(false);
+    visited.insert(st.mat);
+    vis++;
+#ifdef CLEVER
+    state states[4];
+    bool todo[4] = {false, false, false, false};
+#endif
+    u8 i = st.blank >> 2, j = st.blank & 3;
+    if (i > 0) {
+        u8 new_blank = st.blank - COL;
+        auto new_state = do_things(st, new_blank);
+#ifdef CLEVER
+        states[0] = new_state;
+        todo[0] = true;
+#else
+        recur(new_state);
+#endif
+    }
+    if (i < ROW - 1) {
+        u8 new_blank = st.blank + COL;
+        auto new_state = do_things(st, new_blank);
+#ifdef CLEVER
+        states[1] = new_state;
+        todo[1] = true;
+#else
+        recur(new_state);
+#endif
+    }
+    if (j > 0) {
+        u8 new_blank = st.blank - 1;
+        auto new_state = do_things(st, new_blank);
+#ifdef CLEVER
+        states[2] = new_state;
+        todo[2] = true;
+#else
+        recur(new_state);
+#endif
+    }
+    if (j < COL - 1) {
+        u8 new_blank = st.blank + 1;
+        auto new_state = do_things(st, new_blank);
+#ifdef CLEVER
+        states[3] = new_state;
+        todo[3] = true;
+#else
+        recur(new_state);
+#endif
+    }
+
+#ifdef CLEVER
+    for (u8 k = 0; k < 4; k++)
+        if (todo[k] && states[k].dist == st.dist) recur(states[k]);
+    for (u8 k = 0; k < 4; k++)
+        if (todo[k] && states[k].dist != st.dist) recur(states[k]);
+#endif
+
+    visited.erase(st.mat);
+    return;
 }
 
-vector<u64> get_solution(u64 start, u64 end, hm& moves) {
-    vector<u64> stak;
-    stak.push_back(end);
-    u64 mat = end;
-    u8 idx, tmp;
-    for (idx = 0; idx < SZ; idx++)
-        if ((end >> (idx << 2) & 15) == 0) break;
-    tmp = (idx <<= 2);
-
-    while (mat != start) {
-        auto idx_next = moves[mat].blank_prec;
-        u64 el = (mat >> idx_next) & 15;
-        mat &= ~(15ull << idx_next);
-        mat |= (el << idx);
-        stak.push_back(mat);
-        idx = idx_next;
-    }
-    reverse(stak.begin(), stak.end());
-    return stak;
+u8 ida_star(u64 start, u64 fin) {
+    finish = fin, vis = 0, max_dist = 82;
+    auto map_r = map_row(start), map_c = map_col(start);
+    tab_row = generate_table(map_row(finish));
+    tab_col = generate_table(map_col(finish));
+    auto heu = walking_distance(start, map_r, map_c, tab_row, tab_col);
+    u8 blank;
+    for (blank = 0; blank < SZ; blank++)
+        if ((start >> (blank << 2) & 15) == 0) break;
+    state st = {start, map_r, map_c, blank, heu, heu};
+    recur(st);
+    return snapshot.size();
 }
 
 bool is_solvable(u64 mat) {
@@ -273,6 +307,59 @@ bool is_solvable(u64 mat) {
 
     if (row & 1) return !(inv_count & 1);
     else return inv_count & 1;
+}
+
+vector<u64> construct_solution(u64 start, u64 finish) {
+    snapshot.insert(finish);
+    vector<u64> poss, sol;
+    poss.push_back(start);
+    while (snapshot.size()) {
+        u8 k;
+        for (k = 0; k < poss.size() - 1; k++)
+            if (snapshot.count(poss[k])) break;
+
+        u64 mat = poss[k];
+        poss.clear();
+        sol.push_back(mat);
+        snapshot.erase(mat);
+        u8 blank;
+        for (blank = 0; blank < SZ; blank++)
+            if ((mat >> (blank << 2) & 15) == 0) break;
+        u8 i = blank >> 2, j = blank & 3;
+        if (i > 0) {
+            u8 new_blank = blank - COL;
+            u64 node_value = (mat >> (new_blank << 2)) & 15;
+            u64 new_mat = mat;
+            new_mat -= node_value << (new_blank << 2);
+            new_mat += node_value << (blank << 2);
+            poss.push_back(new_mat);
+        }
+        if (i < ROW - 1) {
+            u8 new_blank = blank + COL;
+            u64 node_value = (mat >> (new_blank << 2)) & 15;
+            u64 new_mat = mat;
+            new_mat -= node_value << (new_blank << 2);
+            new_mat += node_value << (blank << 2);
+            poss.push_back(new_mat);
+        }
+        if (j > 0) {
+            u8 new_blank = blank - 1;
+            u64 node_value = (mat >> (new_blank << 2)) & 15;
+            u64 new_mat = mat;
+            new_mat -= node_value << (new_blank << 2);
+            new_mat += node_value << (blank << 2);
+            poss.push_back(new_mat);
+        }
+        if (j < COL - 1) {
+            u8 new_blank = blank + 1;
+            u64 node_value = (mat >> (new_blank << 2)) & 15;
+            u64 new_mat = mat;
+            new_mat -= node_value << (new_blank << 2);
+            new_mat += node_value << (blank << 2);
+            poss.push_back(new_mat);
+        }
+    }
+    return sol;
 }
 
 void print_solution(vector<u64>& sol, bool erase = true) {
@@ -306,18 +393,15 @@ int main() {
     }
     assert(is_solvable(mat));
     u64 finish = 0x0fedcba987654321;
-    table tab_row = generate_table(map_row(finish));
-    table tab_col = generate_table(map_col(finish));
-    hm moves;
 
     using namespace std::chrono;
     auto start_time = high_resolution_clock::now();
-    auto processed = a_star(mat, finish, moves, tab_row, tab_col);
+    u8 ans = ida_star(mat, finish);
     auto stop_time = high_resolution_clock::now();
     auto duration = duration_cast<milliseconds>(stop_time - start_time);
-    auto sol = get_solution(mat, finish, moves);
-    cout << sol.size() - 1 << " moves found in " << duration.count() << "ms (" << processed << " different position processed)" << endl;
+    cout << (int)ans << " moves found in " << duration.count() << "ms (" << vis << " position processed)" << endl;
 
-    // print_solution(sol);
+    auto sol = construct_solution(mat, finish);
+    print_solution(sol);
     return 0;
 }
